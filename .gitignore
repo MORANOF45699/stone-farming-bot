@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# ไฟล์เฉพาะเครื่อง (แต่ละคน calibrate เอง)
+calibration.json
+
+# ภาพ debug ที่บอทบันทึกตอนรัน
+debug_images/
+counter_raw.png
+counter_mask.png
+full_template_debug.png
+
+# ไฟล์ชั่วคราว
+*.log

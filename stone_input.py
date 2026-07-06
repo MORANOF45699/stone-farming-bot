@@ -1,0 +1,167 @@
+"""
+stone_input.py - DirectInput สำหรับ Stone Bot
+คีย์บอร์ดใช้ SendInput scancode (เกม FiveM รับได้)
+เมาส์ใน UI (NUI) ใช้ SetCursorPos + SendInput click
+"""
+
+import ctypes
+import time
+
+SendInput = ctypes.windll.user32.SendInput
+SetCursorPos = ctypes.windll.user32.SetCursorPos
+
+# ===== Scan Codes =====
+KEY_L = 0x26
+KEY_G = 0x22
+KEY_E = 0x12
+KEY_ESC = 0x01
+
+PUL = ctypes.POINTER(ctypes.c_ulong)
+
+
+class KeyBdInput(ctypes.Structure):
+    _fields_ = [
+        ("wVk", ctypes.c_ushort),
+        ("wScan", ctypes.c_ushort),
+        ("dwFlags", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("dwExtraInfo", PUL)
+    ]
+
+
+class HardwareInput(ctypes.Structure):
+    _fields_ = [
+        ("uMsg", ctypes.c_ulong),
+        ("wParamL", ctypes.c_short),
+        ("wParamH", ctypes.c_ushort)
+    ]
+
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [
+        ("dx", ctypes.c_long),
+        ("dy", ctypes.c_long),
+        ("mouseData", ctypes.c_ulong),
+        ("dwFlags", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("dwExtraInfo", PUL)
+    ]
+
+
+class Input_I(ctypes.Union):
+    _fields_ = [
+        ("ki", KeyBdInput),
+        ("mi", MouseInput),
+        ("hi", HardwareInput)
+    ]
+
+
+class Input(ctypes.Structure):
+    _fields_ = [
+        ("type", ctypes.c_ulong),
+        ("ii", Input_I)
+    ]
+
+
+KEYEVENTF_SCANCODE = 0x0008
+KEYEVENTF_KEYUP = 0x0002
+
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_WHEEL = 0x0800
+WHEEL_DELTA = 120
+
+INPUT_MOUSE = 0
+INPUT_KEYBOARD = 1
+
+
+def _key_event(scan_code, flags):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    ii_.ki = KeyBdInput(0, scan_code, flags, 0, ctypes.pointer(extra))
+    x = Input(ctypes.c_ulong(INPUT_KEYBOARD), ii_)
+    SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+
+def _mouse_event(flags, data=0):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    ii_.mi = MouseInput(0, 0, data, flags, 0, ctypes.pointer(extra))
+    x = Input(ctypes.c_ulong(INPUT_MOUSE), ii_)
+    SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+
+def scroll_up(notches=3, x=None, y=None, delay=0.08):
+    """เลื่อนล้อเมาส์ขึ้น (ไปบนสุดของ inventory) notches = จำนวนคลิกล้อ"""
+    if x is not None and y is not None:
+        move_to(x, y)
+        time.sleep(0.05)
+    for _ in range(notches):
+        _mouse_event(MOUSEEVENTF_WHEEL, WHEEL_DELTA)
+        time.sleep(delay)
+
+
+def scroll_down(notches=3, x=None, y=None, delay=0.08):
+    """เลื่อนล้อเมาส์ลง"""
+    if x is not None and y is not None:
+        move_to(x, y)
+        time.sleep(0.05)
+    neg = ctypes.c_long(-WHEEL_DELTA).value & 0xFFFFFFFF
+    for _ in range(notches):
+        _mouse_event(MOUSEEVENTF_WHEEL, neg)
+        time.sleep(delay)
+
+
+def press_key(scan_code, duration=0.08):
+    """กดปุ่มแล้วปล่อย"""
+    _key_event(scan_code, KEYEVENTF_SCANCODE)
+    time.sleep(duration)
+    _key_event(scan_code, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP)
+
+
+def press_l():
+    press_key(KEY_L)
+
+
+def press_g():
+    press_key(KEY_G)
+
+
+def press_esc():
+    press_key(KEY_ESC)
+
+
+def move_to(x, y):
+    """เลื่อน cursor ไปพิกัดหน้าจอ (สำหรับ UI ที่มี cursor)"""
+    SetCursorPos(int(x), int(y))
+
+
+def click(x, y, delay=0.1):
+    """คลิกซ้ายที่พิกัด"""
+    move_to(x, y)
+    time.sleep(0.05)
+    _mouse_event(MOUSEEVENTF_LEFTDOWN)
+    time.sleep(delay)
+    _mouse_event(MOUSEEVENTF_LEFTUP)
+
+
+def drag(x1, y1, x2, y2, duration=0.6, steps=25):
+    """ลากไอเทมจาก (x1,y1) ไป (x2,y2) แบบ smooth"""
+    move_to(x1, y1)
+    time.sleep(0.15)
+    _mouse_event(MOUSEEVENTF_LEFTDOWN)
+    time.sleep(0.15)
+    for i in range(1, steps + 1):
+        t = i / steps
+        move_to(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)
+        time.sleep(duration / steps)
+    time.sleep(0.15)
+    _mouse_event(MOUSEEVENTF_LEFTUP)
+
+
+if __name__ == '__main__':
+    print("=== ทดสอบ Stone Input ===")
+    print("สลับไปหน้าเกมภายใน 3 วินาที... จะกด L")
+    time.sleep(3)
+    press_l()
+    print("กด L แล้ว")
